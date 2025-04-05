@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Molecular Mastermind</title>
+    <style>
+        :root {
+            --primary: #6a11cb;
+            --secondary: #2575fc;
+            --accent: #ff3e9d;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --success: #4caf50;
+            --error: #ff5252;
+            --warning: #ffc107;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: var(--light);
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            animation: float 3s ease-in-out infinite;
+            background: linear-gradient(to right, var(--accent), #ff8a00);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        
+        .game-area {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            margin-top: 2rem;
+            transition: all 0.3s ease;
+        }
+        
+        .target-compound-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .target-compound {
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .compound-description {
+            font-size: 1rem;
+            opacity: 0.8;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .difficulty-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+        
+        .difficulty-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .difficulty-dot.active {
+            background: var(--accent);
+        }
+        
+        .elements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .element {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .element:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .element-symbol {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .element-name {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        
+        .selected-elements {
+            min-height: 100px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.1);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .selected-elements.empty {
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .selected-element {
+            background: var(--accent);
+            color: white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            animation: popIn 0.3s ease-out;
+            position: relative;
+        }
+        
+        .selected-element .count {
+            position: absolute;
+            bottom: -10px;
+            right: -10px;
+            background: white;
+            color: var(--dark);
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        button {
+            background: linear-gradient(to right, var(--accent), #ff8a00);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            transform: none;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        
+        .score-display {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .score-value {
+            font-weight: bold;
+            background: rgba(255,255,255,0.2);
+            padding: 0.3rem 1rem;
+            border-radius: 50px;
+        }
+        
+        .feedback {
+            min-height: 60px;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .success {
+            background: rgba(76, 175, 80, 0.2);
+            color: var(--success);
+            font-weight: bold;
+        }
+        
+        .error {
+            background: rgba(255, 82, 82, 0.2);
+            color: var(--error);
+        }
+        
+        .partially-correct {
+            background: rgba(255, 193, 7, 0.2);
+            color: var(--warning);
+        }
+        
+        .atom {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.6);
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .molecule-preview {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .bond {
+            position: absolute;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.5);
+            transform-origin: left center;
+            z-index: 1;
+        }
+        
+        .timer-container {
+            margin-bottom: 1rem;
+        }
+        
+        .timer {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .time-remaining {
+            display: inline-block;
+            min-width: 50px;
+        }
+        
+        .progress-bar {
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .progress {
+            height: 100%;
+            background: linear-gradient(to right, var(--accent), #ff8a00);
+            width: 100%;
+            transition: width 0.1s linear;
+        }
+        
+        .combo-counter {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-top: 0.5rem;
+        }
+        
+        .combo-high {
+            color: var(--accent);
+            font-weight: bold;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+        
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(255, 255, 255, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.9); }
+        }
+        
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        .glow {
+            animation: glow 1.5s infinite;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+            
+            .target-compound {
+                font-size: 2rem;
+            }
+            
+            .elements-grid {
+                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            }
+            
+            .selected-element {
+                width: 50px;
+                height: 50px;
+                font-size: 0.9rem;
+            }
+            
+            .controls {
+                flex-wrap: wrap;
+            }
+            
+            button {
+                flex: 1;
+                min-width: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Molecular Mastermind</h1>
+        <p class="subtitle">Combine elements to create chemical compounds before time runs out!</p>
+        
+        <div class="score-display">
+            <span>Score:</span>
+            <span class="score-value" id="score">0</span>
+            <span class="combo-counter">Combo: <span id="combo">0</span>x</span>
+        </div>
+        
+        <div class="timer-container">
+            <div class="timer">Time: <span class="time-remaining" id="time">60</span>s</div>
+            <div class="progress-bar">
+                <div class="progress" id="progress"></div>
+            </div>
+        </div>
+        
+        <div class="game-area">
+            <div class="target-compound-container">
+                <div class="target-compound" id="target-compound">Water</div>
+                <div class="compound-description" id="compound-description">Essential for life. Covers 71% of Earth's surface.</div>
+                <div class="difficulty-indicator" id="difficulty-indicator">
+                    <div class="difficulty-dot"></div>
+                    <div class="difficulty-dot"></div>
+                    <div class="difficulty-dot"></div>
+                    <div class="difficulty-dot"></div>
+                    <div class="difficulty-dot"></div>
+                </div>
+            </div>
+            
+            <!-- <div class="molecule-preview" id="molecule-preview"> -->
+                <!-- Bonds and atoms will be added here dynamically -->
+            </div>
+            
+            <div class="feedback" id="feedback"></div>
+            
+            <div class="selected-elements empty" id="selected-elements">
+                <div class="hint">Select elements from below to build your compound</div>
+            </div>
+            
+            <div class="controls">
+                <button id="submit-btn">Submit Compound</button>
+                <button id="clear-btn">Clear</button>
+                <button id="hint-btn">Hint</button>
+            </div>
+            
+            <div class="elements-grid" id="elements-grid">
+                <!-- Elements will be added here dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Enhanced game data with difficulty levels
+        const compounds = {
+            "Water": { 
+                formula: "H2O", 
+                description: "Essential for life. Covers 71% of Earth's surface.",
+                difficulty: 1
+            },
+            "Carbon Dioxide": { 
+                formula: "CO2", 
+                description: "Greenhouse gas. Plants use it for photosynthesis.",
+                difficulty: 1
+            },
+            "Salt": { 
+                formula: "NaCl", 
+                description: "Table salt. Essential for human physiology.",
+                difficulty: 1
+            },
+            "Methane": { 
+                formula: "CH4", 
+                description: "Primary component of natural gas. Potent greenhouse gas.",
+                difficulty: 2
+            },
+            "Ammonia": { 
+                formula: "NH3", 
+                description: "Used in fertilizers. Has a pungent smell.",
+                difficulty: 2
+            },
+            "Hydrogen Peroxide": { 
+                formula: "H2O2", 
+                description: "Used as disinfectant. Bleaching agent.",
+                difficulty: 2
+            },
+            "Sulfuric Acid": { 
+                formula: "H2SO4", 
+                description: "Important industrial chemical. Highly corrosive.",
+                difficulty: 3
+            },
+            "Ethanol": { 
+                formula: "C2H5OH", 
+                description: "Drinking alcohol. Also used as fuel.",
+                difficulty: 3
+            },
+            "Glucose": { 
+                formula: "C6H12O6", 
+                description: "Simple sugar. Primary energy source for cells.",
+                difficulty: 4
+            },
+            "Calcium Carbonate": { 
+                formula: "CaCO3", 
+                description: "Main component of limestone and seashells.",
+                difficulty: 4
+            },
+            "Sodium Hydroxide": { 
+                formula: "NaOH", 
+                description: "Strong base used in many industrial processes.",
+                difficulty: 4
+            },
+            "Acetic Acid": { 
+                formula: "CH3COOH", 
+                description: "Main component of vinegar. Gives it sour taste.",
+                difficulty: 5
+            },
+            "Aspirin": { 
+                formula: "C9H8O4", 
+                description: "Common pain reliever and anti-inflammatory drug.",
+                difficulty: 5
+            }
+        };
+
+        const elements = {
+            'H': { name: 'Hydrogen', color: '#FF9999', atomicNumber: 1 },
+            'O': { name: 'Oxygen', color: '#FF6666', atomicNumber: 8 },
+            'C': { name: 'Carbon', color: '#CCCCCC', atomicNumber: 6 },
+            'Na': { name: 'Sodium', color: '#FFCC66', atomicNumber: 11 },
+            'Cl': { name: 'Chlorine', color: '#99FF99', atomicNumber: 17 },
+            'N': { name: 'Nitrogen', color: '#99CCFF', atomicNumber: 7 },
+            'S': { name: 'Sulfur', color: '#FFCC33', atomicNumber: 16 },
+            'Ca': { name: 'Calcium', color: '#FFEE99', atomicNumber: 20 },
+            'K': { name: 'Potassium', color: '#FF9966', atomicNumber: 19 },
+            'P': { name: 'Phosphorus', color: '#FFB266', atomicNumber: 15 }
+        };
+
+        // Game state
+        let currentCompound = null;
+        let currentFormula = null;
+        let selectedElements = {};
+        let score = 0;
+        let combo = 0;
+        let availableElements = [];
+        let timeLeft = 60;
+        let timerInterval = null;
+        let gameActive = true;
+        let difficultyFilter = 1; // Start with easy compounds
+
+        // DOM elements
+        const targetCompoundEl = document.getElementById('target-compound');
+        const compoundDescriptionEl = document.getElementById('compound-description');
+        const elementsGridEl = document.getElementById('elements-grid');
+        const selectedElementsEl = document.getElementById('selected-elements');
+        const submitBtn = document.getElementById('submit-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const hintBtn = document.getElementById('hint-btn');
+        const feedbackEl = document.getElementById('feedback');
+        const scoreEl = document.getElementById('score');
+        const comboEl = document.getElementById('combo');
+        const moleculePreviewEl = document.getElementById('molecule-preview');
+        const timeEl = document.getElementById('time');
+        const progressEl = document.getElementById('progress');
+        const difficultyIndicatorEl = document.getElementById('difficulty-indicator');
+
+        // Initialize game
+        function initGame() {
+            if (!gameActive) return;
+            
+            // Clear any existing timer
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            
+            // Reset timer
+            timeLeft = Math.max(30, 60 - (difficultyFilter * 10)); // Less time for harder compounds
+            updateTimerDisplay();
+            
+            // Start timer
+            timerInterval = setInterval(updateTimer, 1000);
+            
+            // Filter compounds by current difficulty
+            const availableCompounds = Object.keys(compounds).filter(
+                name => compounds[name].difficulty <= difficultyFilter
+            );
+            
+            // Select a random compound from available ones
+            currentCompound = availableCompounds[Math.floor(Math.random() * availableCompounds.length)];
+            currentFormula = parseFormula(compounds[currentCompound].formula);
+            
+            // Set available elements (correct elements + random ones based on difficulty)
+            const correctElements = Object.keys(currentFormula);
+            const allElements = Object.keys(elements);
+            const extraElements = allElements.filter(el => !correctElements.includes(el));
+            
+            // More distracting elements for harder compounds
+            const numDistractions = Math.min(difficultyFilter + 1, extraElements.length);
+            const randomExtras = [...extraElements]
+                .sort(() => 0.5 - Math.random())
+                .slice(0, numDistractions);
+            
+            availableElements = [...correctElements, ...randomExtras]
+                .sort((a, b) => elements[a].atomicNumber - elements[b].atomicNumber);
+            
+            // Update UI
+            targetCompoundEl.textContent = currentCompound;
+            compoundDescriptionEl.textContent = compounds[currentCompound].description;
+            updateDifficultyIndicator(compounds[currentCompound].difficulty);
+            renderElements();
+            updateSelectedElementsDisplay();
+            clearFeedback();
+            renderMoleculePreview();
+            
+            // Create floating atoms in background
+            createFloatingAtoms();
+        }
+
+        // Update difficulty indicator dots
+        function updateDifficultyIndicator(difficulty) {
+            const dots = difficultyIndicatorEl.querySelectorAll('.difficulty-dot');
+            dots.forEach((dot, index) => {
+                dot.classList.toggle('active', index < difficulty);
+            });
+        }
+
+        // Parse chemical formula into elements and counts
+        function parseFormula(formula) {
+            const parsed = {};
+            let i = 0;
+            const n = formula.length;
+            
+            while (i < n) {
+                // Get element symbol (1-2 characters)
+                let symbol;
+                if (i+1 < n && /[a-z]/.test(formula[i+1])) {
+                    symbol = formula.substring(i, i+2);
+                    i += 2;
+                } else {
+                    symbol = formula[i];
+                    i += 1;
+                }
+                
+                // Get count
+                let countStr = '';
+                while (i < n && /\d/.test(formula[i])) {
+                    countStr += formula[i];
+                    i += 1;
+                }
+                const count = countStr ? parseInt(countStr) : 1;
+                
+                parsed[symbol] = count;
+            }
+            
+            return parsed;
+        }
+
+        // Render available elements
+        function renderElements() {
+            elementsGridEl.innerHTML = '';
+            availableElements.forEach(symbol => {
+                const element = document.createElement('div');
+                element.className = 'element';
+                element.style.borderColor = elements[symbol].color;
+                element.innerHTML = `
+                    <div class="element-symbol">${symbol}</div>
+                    <div class="element-name">${elements[symbol].name}</div>
+                `;
+                element.addEventListener('click', () => selectElement(symbol));
+                elementsGridEl.appendChild(element);
+            });
+        }
+
+        // Select an element
+        function selectElement(symbol) {
+            if (!gameActive) return;
+            
+            if (selectedElements[symbol]) {
+                selectedElements[symbol]++;
+            } else {
+                selectedElements[symbol] = 1;
+            }
+            updateSelectedElementsDisplay();
+            animateSelection(symbol);
+            
+            // Remove empty class if present
+            selectedElementsEl.classList.remove('empty');
+        }
+
+        // Update the selected elements display
+        function updateSelectedElementsDisplay() {
+            selectedElementsEl.innerHTML = '';
+            
+            if (Object.keys(selectedElements).length === 0) {
+                selectedElementsEl.innerHTML = '<div class="hint">Select elements from below to build your compound</div>';
+                selectedElementsEl.classList.add('empty');
+                return;
+            }
+            
+            for (const [symbol, count] of Object.entries(selectedElements)) {
+                const element = document.createElement('div');
+                element.className = 'selected-element';
+                element.style.backgroundColor = elements[symbol].color;
+                element.innerHTML = `
+                    ${symbol}
+                    <div class="count">${count}</div>
+                `;
+                element.addEventListener('click', () => adjustElementCount(symbol));
+                selectedElementsEl.appendChild(element);
+            }
+        }
+
+        // Adjust element count on click
+        function adjustElementCount(symbol) {
+            if (!gameActive) return;
+            
+            selectedElements[symbol]++;
+            if (selectedElements[symbol] > (currentFormula[symbol] || 5)) {
+                delete selectedElements[symbol];
+            }
+            updateSelectedElementsDisplay();
+        }
+
+        // Submit the current compound
+        function submitCompound() {
+            if (!gameActive) return;
+            
+            if (Object.keys(selectedElements).length === 0) {
+                showFeedback('Please select at least one element!', 'error');
+                return;
+            }
+            
+            // Check if correct
+            const isCorrect = compareFormulas(selectedElements, currentFormula);
+            
+            if (isCorrect) {
+                // Calculate score based on time left and difficulty
+                const timeBonus = Math.floor(timeLeft / 5);
+                const difficultyBonus = compounds[currentCompound].difficulty * 5;
+                const comboBonus = combo * 2;
+                
+                const pointsEarned = 10 + timeBonus + difficultyBonus + comboBonus;
+                score += pointsEarned;
+                combo++;
+                
+                scoreEl.textContent = score;
+                comboEl.textContent = combo;
+                if (combo >= 3) {
+                    comboEl.classList.add('combo-high');
+                }
+                
+                showFeedback(
+                    `Correct! +${pointsEarned} points (${timeBonus} time bonus, ${difficultyBonus} difficulty bonus, ${comboBonus} combo bonus)`, 
+                    'success'
+                );
+                
+                celebrate();
+                
+                // Increase difficulty every 3 correct answers
+                if (combo % 3 === 0 && difficultyFilter < 5) {
+                    difficultyFilter++;
+                    showFeedback(`Difficulty increased to level ${difficultyFilter}!`, 'partially-correct');
+                }
+                
+                setTimeout(initGame, 2000);
+            } else {
+                // Check what's wrong
+                const correctElements = Object.keys(currentFormula);
+                const userElements = Object.keys(selectedElements);
+                
+                const commonElements = correctElements.filter(el => userElements.includes(el));
+                const missingElements = correctElements.filter(el => !userElements.includes(el));
+                const extraElements = userElements.filter(el => !correctElements.includes(el));
+                
+                let feedbackMessage = 'Not the correct combination. ';
+                
+                if (commonElements.length > 0) {
+                    feedbackMessage += `You have some correct elements (${commonElements.join(', ')}). `;
+                }
+                
+                if (missingElements.length > 0) {
+                    feedbackMessage += `Missing: ${missingElements.join(', ')}. `;
+                }
+                
+                if (extraElements.length > 0) {
+                    feedbackMessage += `Extra elements: ${extraElements.join(', ')}.`;
+                }
+                
+                showFeedback(feedbackMessage, 'error');
+                selectedElementsEl.classList.add('shake');
+                setTimeout(() => selectedElementsEl.classList.remove('shake'), 500);
+                
+                // Reset combo on wrong answer
+                combo = 0;
+                comboEl.textContent = combo;
+                comboEl.classList.remove('combo-high');
+            }
+        }
+
+        // Compare two formula objects
+        function compareFormulas(userFormula, targetFormula) {
+            const userKeys = Object.keys(userFormula).sort();
+            const targetKeys = Object.keys(targetFormula).sort();
+            
+            // Check if same elements
+            if (userKeys.length !== targetKeys.length || 
+                !userKeys.every((val, index) => val === targetKeys[index])) {
+                return false;
+            }
+            
+            // Check counts
+            for (const key of userKeys) {
+                if (userFormula[key] !== targetFormula[key]) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+
+        // Show feedback message
+        function showFeedback(message, type) {
+            feedbackEl.textContent = message;
+            feedbackEl.className = 'feedback ' + type;
+        }
+
+        // Clear feedback
+        function clearFeedback() {
+            feedbackEl.textContent = '';
+            feedbackEl.className = 'feedback';
+        }
+
+        // Clear selected elements
+        function clearSelection() {
+            if (!gameActive) return;
+            
+            selectedElements = {};
+            updateSelectedElementsDisplay();
+            clearFeedback();
+        }
+
+        // Show hint
+        function showHint() {
+            if (!gameActive) return;
+            
+            const formula = compounds[currentCompound].formula;
+            showFeedback(`Hint: The formula is ${formula}`, 'partially-correct');
+            
+            // Penalty for using hint
+            timeLeft = Math.max(5, timeLeft - 10);
+            updateTimerDisplay();
+        }
+
+        // Animation for element selection
+        function animateSelection(symbol) {
+            const elements = Array.from(document.querySelectorAll('.element'));
+            const element = elements.find(el => 
+                el.querySelector('.element-symbol').textContent === symbol
+            );
+            
+            if (element) {
+                element.style.transform = 'scale(1.1)';
+                element.style.boxShadow = `0 0 20px ${elements[symbol].color}`;
+                setTimeout(() => {
+                    element.style.transform = '';
+                    element.style.boxShadow = '';
+                }, 300);
+            }
+        }
+
+        // Celebration animation
+        function celebrate() {
+            for (let i = 0; i < 20; i++) {
+                createConfetti();
+            }
+        }
+
+        // Create confetti particles
+        function createConfetti() {
+            const confetti = document.createElement('div');
+            confetti.className = 'atom';
+            confetti.style.left = Math.random() * 100 + 'vw';
+            confetti.style.top = -20 + 'px';
+            confetti.style.backgroundColor = getRandomColor();
+            confetti.style.width = Math.random() * 10 + 5 + 'px';
+            confetti.style.height = confetti.style.width;
+            document.body.appendChild(confetti);
+            
+            const animationDuration = Math.random() * 3 + 2;
+            
+            confetti.animate([
+                { transform: `translateY(0) rotate(0deg)`, opacity: 1 },
+                { transform: `translateY(${window.innerHeight + 20}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+            ], {
+                duration: animationDuration * 1000,
+                easing: 'cubic-bezier(0.1, 0.8, 0.9, 1)'
+            });
+            
+            setTimeout(() => confetti.remove(), animationDuration * 1000);
+        }
+
+        // Create floating atoms in background
+        function createFloatingAtoms() {
+            // Clear existing atoms
+            document.querySelectorAll('.atom').forEach(el => {
+                if (!el.classList.contains('molecule-atom')) {
+                    el.remove();
+                }
+            });
+            
+            for (let i = 0; i < 15; i++) {
+                const atom = document.createElement('div');
+                atom.className = 'atom';
+                atom.style.left = Math.random() * 100 + 'vw';
+                atom.style.top = Math.random() * 100 + 'vh';
+                atom.style.backgroundColor = getRandomColor();
+                atom.style.width = Math.random() * 20 + 10 + 'px';
+                atom.style.height = atom.style.width;
+                document.body.appendChild(atom);
+                
+                // Animate floating
+                const duration = Math.random() * 20 + 10;
+                const delay = Math.random() * 5;
+                const xMovement = (Math.random() - 0.5) * 100;
+                const yMovement = (Math.random() - 0.5) * 50;
+                
+                atom.animate([
+                    { transform: 'translate(0, 0)' },
+                    { transform: `translate(${xMovement}px, ${yMovement}px)` }
+                ], {
+                    duration: duration * 1000,
+                    delay: delay * 1000,
+                    direction: 'alternate',
+                    iterations: Infinity,
+                    easing: 'ease-in-out'
+                });
+            }
+        }
+
+        // Render molecule preview
+        function renderMoleculePreview() {
+            moleculePreviewEl.innerHTML = '';
+            
+            const elements = Object.keys(currentFormula);
+            const counts = Object.values(currentFormula);
+            const totalAtoms = counts.reduce((sum, count) => sum + count, 0);
+            
+            // Position atoms in a circle
+            const radius = 70;
+            let angle = 0;
+            const angleStep = (2 * Math.PI) / totalAtoms;
+            
+            let atomIndex = 0;
+            for (let i = 0; i < elements.length; i++) {
+                const symbol = elements[i];
+                const count = counts[i];
+                
+                for (let j = 0; j < count; j++) {
+                    const x = radius * Math.cos(angle);
+                    const y = radius * Math.sin(angle);
+                    
+                    const atom = document.createElement('div');
+                    atom.className = 'atom molecule-atom';
+                    atom.style.width = '40px';
+                    atom.style.height = '40px';
+                    atom.style.backgroundColor = this.elements[symbol].color;
+                    atom.style.transform = `translate(${x}px, ${y}px)`;
+                    atom.textContent = symbol;
+                    atom.style.display = 'flex';
+                    atom.style.justifyContent = 'center';
+                    atom.style.alignItems = 'center';
+                    atom.style.fontWeight = 'bold';
+                    atom.style.color = 'black';
+                    
+                    moleculePreviewEl.appendChild(atom);
+                    
+                    // Add bonds to central atom (first atom)
+                    if (atomIndex > 0) {
+                        const bond = document.createElement('div');
+                        bond.className = 'bond';
+                        bond.style.width = `${radius}px`;
+                        bond.style.transform = `rotate(${angle}rad)`;
+                        moleculePreviewEl.insertBefore(bond, atom);
+                    }
+                    
+                    angle += angleStep;
+                    atomIndex++;
+                }
+            }
+        }
+
+        // Update timer display
+        function updateTimer() {
+            if (!gameActive) return;
+            
+            timeLeft--;
+            updateTimerDisplay();
+            
+            if (timeLeft <= 0) {
+                timeLeft = 0;
+                endGame();
+            }
+        }
+
+        // Update timer UI
+        function updateTimerDisplay() {
+            timeEl.textContent = timeLeft;
+            const percentage = (timeLeft / 60) * 100;
+            progressEl.style.width = `${percentage}%`;
+            
+            // Change color when time is running low
+            if (timeLeft <= 10) {
+                progressEl.style.background = 'linear-gradient(to right, #ff5252, #ff8a00)';
+                timeEl.parentElement.classList.add('glow');
+            } else {
+                progressEl.style.background = 'linear-gradient(to right, var(--accent), #ff8a00)';
+                timeEl.parentElement.classList.remove('glow');
+            }
+        }
+
+        // End game when time runs out
+        function endGame() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            
+            showFeedback(`Game Over! Final Score: ${score}`, 'error');
+            submitBtn.disabled = true;
+            hintBtn.disabled = true;
+            
+            // Add restart button
+            const restartBtn = document.createElement('button');
+            restartBtn.textContent = 'Play Again';
+            restartBtn.id = 'restart-btn';
+            restartBtn.style.marginTop = '1rem';
+            restartBtn.addEventListener('click', restartGame);
+            
+            feedbackEl.appendChild(document.createElement('br'));
+            feedbackEl.appendChild(restartBtn);
+        }
+
+        // Restart game
+        function restartGame() {
+            gameActive = true;
+            score = 0;
+            combo = 0;
+            difficultyFilter = 1;
+            scoreEl.textContent = score;
+            comboEl.textContent = combo;
+            comboEl.classList.remove('combo-high');
+            
+            submitBtn.disabled = false;
+            hintBtn.disabled = false;
+            
+            // Remove restart button
+            const restartBtn = document.getElementById('restart-btn');
+            if (restartBtn) {
+                restartBtn.remove();
+            }
+            
+            clearSelection();
+            initGame();
+        }
+
+        // Get random color
+        function getRandomColor() {
+            const colors = ['#FF9999', '#FF6666', '#99FF99', '#99CCFF', '#FFCC66', '#FFCC33'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // Event listeners
+        submitBtn.addEventListener('click', submitCompound);
+        clearBtn.addEventListener('click', clearSelection);
+        hintBtn.addEventListener('click', showHint);
+
+        // Initialize the game
+        initGame();
+    </script>
+</body>
+</html>

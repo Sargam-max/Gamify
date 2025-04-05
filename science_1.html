@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chemistry Equation Master</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            height: 100vh;
+            color: white;
+        }
+        canvas { 
+            display: block; 
+            background: rgba(0, 0, 0, 0.7); 
+        }
+        #score-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #equation-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 10px;
+        }
+        #timer {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 10px;
+        }
+        .particle {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="score-display">Score: 0</div>
+    <div id="equation-display">Combine elements to form: H₂O</div>
+    <div id="timer">Time: 60</div>
+    <audio id="bubblePop" src="sounds/bubble.mp3"></audio>
+    <audio id="successSound" src="sounds/winning.mp3"></audio>
+    <audio id="bgMusic" loop src="sounds/bg.mp3"></audio>
+    
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Game state
+        let gameState = "MENU";
+        let score = 0;
+        let timeLeft = 60;
+        let gameTimer;
+        
+        // Elements and compounds
+        const elements = ["H", "O", "C", "N", "Na", "Cl", "K"];
+        const compounds = [
+            { formula: "H₂O", name: "Water", elements: ["H", "H", "O"] },
+            { formula: "CO₂", name: "Carbon Dioxide", elements: ["C", "O", "O"] },
+            { formula: "NaCl", name: "Sodium Chloride", elements: ["Na", "Cl"] },
+            { formula: "NH₃", name: "Ammonia", elements: ["N", "H", "H", "H"] }
+        ];
+        
+        let currentTarget = compounds[0];
+        let selectedElements = [];
+        let bubbles = [];
+        let particles = [];
+        
+        // Audio elements
+        const bubblePopSound = document.getElementById("bubblePop");
+        const successSound = document.getElementById("successSound");
+        const bgMusic = document.getElementById("bgMusic");
+        bgMusic.volume = 0.3;
+
+        // Create floating bubbles with elements
+        function createBubbles() {
+            bubbles = Array.from({ length: 15 }, () => {
+                const element = elements[Math.floor(Math.random() * elements.length)];
+                return {
+                    symbol: element,
+                    x: Math.random() * (canvas.width - 100) + 50,
+                    y: canvas.height + 50,
+                    targetY: Math.random() * (canvas.height - 200) + 100,
+                    size: Math.random() * (60 - 40) + 40,
+                    speed: Math.random() * (2 - 0.5) + 0.5,
+                    angle: Math.random() * Math.PI * 2,
+                    color: getElementColor(element),
+                    opacity: 0,
+                    selected: false,
+                    popScale: 1
+                };
+            });
+        }
+
+        // Get color based on element
+        function getElementColor(element) {
+            const colors = {
+                "H": "rgba(255, 255, 255, 0.8)",  // White
+                "O": "rgba(255, 0, 0, 0.8)",      // Red
+                "C": "rgba(100, 100, 100, 0.8)",   // Dark gray
+                "N": "rgba(0, 0, 255, 0.8)",       // Blue
+                "Na": "rgba(255, 200, 0, 0.8)",    // Yellow
+                "Cl": "rgba(0, 255, 0, 0.8)",      // Green
+                "K": "rgba(255, 100, 0, 0.8)"      // Orange
+            };
+            return colors[element] || "rgba(200, 200, 200, 0.8)";
+        }
+
+        // Draw floating bubbles
+        function drawBubbles() {
+            bubbles.forEach(bubble => {
+                // Animate bubble entrance
+                if (bubble.y > bubble.targetY) {
+                    bubble.y -= bubble.speed;
+                }
+                
+                // Fade in
+                if (bubble.opacity < 1) {
+                    bubble.opacity += 0.02;
+                }
+                
+                // Floating animation
+                bubble.x += Math.sin(bubble.angle) * 0.5;
+                bubble.angle += 0.02;
+                
+                // Reset if bubble goes off screen
+                if (bubble.y < -50) {
+                    resetBubble(bubble);
+                }
+                
+                // Draw bubble with glow if selected
+                ctx.save();
+                ctx.globalAlpha = bubble.opacity;
+                
+                if (bubble.selected) {
+                    // Glow effect
+                    ctx.shadowColor = "white";
+                    ctx.shadowBlur = 20;
+                    bubble.popScale += 0.05;
+                    if (bubble.popScale > 1.5) {
+                        createParticles(bubble.x, bubble.y, bubble.color, 10);
+                        resetBubble(bubble);
+                        bubble.selected = false;
+                        bubblePopSound.currentTime = 0;
+                        bubblePopSound.play();
+                    }
+                }
+                
+                // Draw bubble
+                ctx.beginPath();
+                ctx.arc(bubble.x, bubble.y, bubble.size * bubble.popScale, 0, Math.PI * 2);
+                ctx.fillStyle = bubble.color;
+                ctx.fill();
+                
+                // Bubble highlight
+                ctx.strokeStyle = `rgba(255, 255, 255, ${bubble.opacity * 0.7})`;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Draw element symbol
+                ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+                ctx.font = `${Math.floor(bubble.size * 0.5)}px Orbitron`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(bubble.symbol, bubble.x, bubble.y);
+                
+                ctx.restore();
+            });
+        }
+
+        function resetBubble(bubble) {
+            bubble.symbol = elements[Math.floor(Math.random() * elements.length)];
+            bubble.x = Math.random() * (canvas.width - 100) + 50;
+            bubble.y = canvas.height + 50;
+            bubble.targetY = Math.random() * (canvas.height - 200) + 100;
+            bubble.size = Math.random() * (60 - 40) + 40;
+            bubble.speed = Math.random() * (2 - 0.5) + 0.5;
+            bubble.angle = Math.random() * Math.PI * 2;
+            bubble.color = getElementColor(bubble.symbol);
+            bubble.opacity = 0;
+            bubble.popScale = 1;
+        }
+
+        // Create particles for effects
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    size: Math.random() * 5 + 2,
+                    color: color,
+                    speedX: Math.random() * 6 - 3,
+                    speedY: Math.random() * 6 - 3,
+                    life: 100,
+                    decay: Math.random() * 3 + 1
+                });
+            }
+        }
+
+        // Update and draw particles
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.speedX;
+                p.y += p.speedY;
+                p.life -= p.decay;
+                
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                
+                ctx.globalAlpha = p.life / 100;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        // Draw the main menu
+        function drawMenu() {
+            // Animated background
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, "#1a2a6c");
+            gradient.addColorStop(0.5, "#b21f1f");
+            gradient.addColorStop(1, "#fdbb2d");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Title with glow effect
+            ctx.shadowColor = "white";
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = "white";
+            ctx.font = "bold 60px Orbitron";
+            ctx.textAlign = "center";
+            ctx.fillText("CHEMISTRY EQUATION MASTER", canvas.width / 2, 120);
+            ctx.shadowBlur = 0;
+            
+            // Subtitle
+            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.font = "24px Roboto";
+            ctx.fillText("Combine elements to form compounds!", canvas.width / 2, 170);
+            
+            // Start button
+            ctx.fillStyle = "rgba(0, 200, 100, 0.7)";
+            ctx.shadowColor = "rgba(0, 200, 100, 0.5)";
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.roundRect(canvas.width / 2 - 150, canvas.height / 2 - 40, 300, 80, 20);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = "white";
+            ctx.font = "bold 30px Roboto";
+            ctx.fillText("START GAME", canvas.width / 2, canvas.height / 2 + 10);
+            
+            // Instructions button
+            ctx.fillStyle = "rgba(0, 100, 200, 0.7)";
+            ctx.shadowColor = "rgba(0, 100, 200, 0.5)";
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.roundRect(canvas.width / 2 - 150, canvas.height / 2 + 60, 300, 80, 20);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = "white";
+            ctx.fillText("INSTRUCTIONS", canvas.width / 2, canvas.height / 2 + 110);
+            
+            // Footer
+            ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+            ctx.font = "16px Roboto";
+            ctx.fillText("Click elements to combine them into compounds", canvas.width / 2, canvas.height - 50);
+        }
+
+        // Draw instructions screen
+        function drawInstructions() {
+            // Background
+            ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Title
+            ctx.fillStyle = "white";
+            ctx.font = "bold 50px Orbitron";
+            ctx.textAlign = "center";
+            ctx.fillText("HOW TO PLAY", canvas.width / 2, 100);
+            
+            // Instructions
+            ctx.font = "24px Roboto";
+            ctx.textAlign = "left";
+            
+            const instructions = [
+                "1. Your goal is to create chemical compounds by combining elements.",
+                "2. Click on floating element bubbles to select them.",
+                "3. When you've selected the correct elements for the target compound,",
+                "   they will automatically combine and you'll earn points!",
+                "4. Each correct combination gives you more time.",
+                "5. The game ends when time runs out.",
+                "",
+                "Example: To make water (H₂O), click two H bubbles and one O bubble."
+            ];
+            
+            instructions.forEach((line, i) => {
+                ctx.fillText(line, canvas.width / 2 - 300, 180 + i * 40);
+            });
+            
+            // Back button
+            ctx.fillStyle = "rgba(200, 50, 50, 0.7)";
+            ctx.shadowColor = "rgba(200, 50, 50, 0.5)";
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.roundRect(canvas.width / 2 - 100, canvas.height - 100, 200, 60, 15);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = "white";
+            ctx.font = "bold 24px Roboto";
+            ctx.textAlign = "center";
+            ctx.fillText("BACK", canvas.width / 2, canvas.height - 65);
+        }
+
+        // Draw game over screen
+        function drawGameOver() {
+            // Dark overlay
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Game over text
+            ctx.fillStyle = "white";
+            ctx.font = "bold 70px Orbitron";
+            ctx.textAlign = "center";
+            ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 50);
+            
+            // Score display
+            ctx.font = "36px Roboto";
+            ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+            
+            // Play again button
+            ctx.fillStyle = "rgba(0, 200, 100, 0.7)";
+            ctx.shadowColor = "rgba(0, 200, 100, 0.5)";
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.roundRect(canvas.width / 2 - 150, canvas.height / 2 + 80, 300, 80, 20);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = "white";
+            ctx.font = "bold 30px Roboto";
+            ctx.fillText("PLAY AGAIN", canvas.width / 2, canvas.height / 2 + 130);
+        }
+
+        // Check if selected elements match target compound
+        function checkCombination() {
+            // Convert both arrays to strings for easy comparison
+            const selected = [...selectedElements].sort().join(",");
+            const target = [...currentTarget.elements].sort().join(",");
+            
+            if (selected === target) {
+                // Correct combination!
+                successSound.currentTime = 0;
+                successSound.play();
+                
+                score += 100;
+                timeLeft += 10; // Add bonus time
+                document.getElementById("score-display").textContent = `Score: ${score}`;
+                
+                // Create celebration particles
+                createParticles(canvas.width / 2, canvas.height / 2, "gold", 50);
+                
+                // Select new random target
+                currentTarget = compounds[Math.floor(Math.random() * compounds.length)];
+                document.getElementById("equation-display").textContent = 
+                    `Combine elements to form: ${currentTarget.formula} (${currentTarget.name})`;
+                
+                // Clear selected elements
+                selectedElements = [];
+            }
+        }
+
+        // Handle click events
+        canvas.addEventListener("click", (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            if (gameState === "MENU") {
+                // Start game button
+                if (x > canvas.width / 2 - 150 && x < canvas.width / 2 + 150 &&
+                    y > canvas.height / 2 - 40 && y < canvas.height / 2 + 40) {
+                    gameState = "PLAYING";
+                    startGame();
+                }
+                // Instructions button
+                else if (x > canvas.width / 2 - 150 && x < canvas.width / 2 + 150 &&
+                         y > canvas.height / 2 + 60 && y < canvas.height / 2 + 140) {
+                    gameState = "INSTRUCTIONS";
+                }
+            } 
+            else if (gameState === "INSTRUCTIONS") {
+                // Back button
+                if (x > canvas.width / 2 - 100 && x < canvas.width / 2 + 100 &&
+                    y > canvas.height - 100 && y < canvas.height - 40) {
+                    gameState = "MENU";
+                }
+            }
+            else if (gameState === "PLAYING") {
+                // Check if clicked on a bubble
+                bubbles.forEach(bubble => {
+                    const distance = Math.sqrt((x - bubble.x) ** 2 + (y - bubble.y) ** 2);
+                    if (distance <= bubble.size && !bubble.selected) {
+                        bubble.selected = true;
+                        selectedElements.push(bubble.symbol);
+                        checkCombination();
+                    }
+                });
+            }
+            else if (gameState === "GAME_OVER") {
+                // Play again button
+                if (x > canvas.width / 2 - 150 && x < canvas.width / 2 + 150 &&
+                    y > canvas.height / 2 + 80 && y < canvas.height / 2 + 160) {
+                    gameState = "PLAYING";
+                    startGame();
+                }
+            }
+        });
+
+        // Start a new game
+        function startGame() {
+            score = 0;
+            timeLeft = 60;
+            selectedElements = [];
+            currentTarget = compounds[Math.floor(Math.random() * compounds.length)];
+            
+            document.getElementById("score-display").textContent = `Score: ${score}`;
+            document.getElementById("equation-display").textContent = 
+                `Combine elements to form: ${currentTarget.formula} (${currentTarget.name})`;
+            
+            createBubbles();
+            bgMusic.currentTime = 0;
+            bgMusic.play();
+            
+            // Start game timer
+            clearInterval(gameTimer);
+            gameTimer = setInterval(() => {
+                timeLeft--;
+                document.getElementById("timer").textContent = `Time: ${timeLeft}`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(gameTimer);
+                    gameState = "GAME_OVER";
+                    bgMusic.pause();
+                }
+            }, 1000);
+        }
+
+        // Main game loop
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            switch (gameState) {
+                case "MENU":
+                    drawMenu();
+                    break;
+                case "INSTRUCTIONS":
+                    drawInstructions();
+                    break;
+                case "PLAYING":
+                    drawBubbles();
+                    updateParticles();
+                    break;
+                case "GAME_OVER":
+                    drawGameOver();
+                    updateParticles();
+                    break;
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Add roundRect method to CanvasRenderingContext2D
+        CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+            if (w < 2 * r) r = w / 2;
+            if (h < 2 * r) r = h / 2;
+            this.beginPath();
+            this.moveTo(x + r, y);
+            this.arcTo(x + w, y, x + w, y + h, r);
+            this.arcTo(x + w, y + h, x, y + h, r);
+            this.arcTo(x, y + h, x, y, r);
+            this.arcTo(x, y, x + w, y, r);
+            this.closePath();
+            return this;
+        };
+
+        // Initialize the game
+        gameLoop();
+        
+        // Handle window resize
+        window.addEventListener("resize", () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>

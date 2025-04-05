@@ -1,0 +1,1689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bug Blaster: Math Adventure</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #121212;
+            overflow: hidden;
+            font-family: 'Luckiest Guy', cursive, sans-serif;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap');
+        
+        #gameContainer {
+            position: relative;
+            width: 1280px;
+            height: 720px;
+        }
+        
+        canvas {
+            border: 6px solid #6a4c93;
+            box-shadow: 0 0 40px rgba(138, 90, 68, 0.7);
+            border-radius: 15px;
+            background-color: #000;
+        }
+        
+        #loadingScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+        
+        #loadingBar {
+            width: 60%;
+            height: 30px;
+            border: 3px solid #6a4c93;
+            border-radius: 15px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        
+        #loadingProgress {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #FF4D4D, #FFB84D);
+            transition: width 0.3s ease;
+        }
+        
+        h1 {
+            font-size: 72px;
+            margin: 0;
+            color: #FFB84D;
+            text-shadow: 0 0 10px rgba(255, 184, 77, 0.7),
+                         0 0 20px rgba(255, 184, 77, 0.5),
+                         0 0 30px rgba(255, 184, 77, 0.3);
+            letter-spacing: 2px;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 24px;
+            color: #4DFF4D;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="1280" height="720"></canvas>
+        <div id="loadingScreen">
+            <h1>BUG BLASTER</h1>
+            <p>Loading Math Adventure...</p>
+            <div id="loadingBar">
+                <div id="loadingProgress"></div>
+            </div>
+        </div>
+        <div id="instructions" style="display: none;">
+            WASD to move | Mouse to aim | Click to shoot | Type answers & press Enter
+        </div>
+    </div>
+    
+    <script>
+        // Game canvas setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const loadingScreen = document.getElementById('loadingScreen');
+        const loadingProgress = document.getElementById('loadingProgress');
+        const instructions = document.getElementById('instructions');
+        
+        // Preload assets
+        const assetsToLoad = [];
+        let assetsLoaded = 0;
+        
+        function loadAssets() {
+            // Simulate loading progress
+            const totalAssets = 15;
+            const interval = setInterval(() => {
+                assetsLoaded++;
+                loadingProgress.style.width = `${(assetsLoaded / totalAssets) * 100}%`;
+                
+                if (assetsLoaded >= totalAssets) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        loadingScreen.style.opacity = '0';
+                        setTimeout(() => {
+                            loadingScreen.style.display = 'none';
+                            instructions.style.display = 'block';
+                        }, 500);
+                    }, 300);
+                }
+            }, 200);
+        }
+        
+        // Vibrant color palette with more variations
+        const COLORS = {
+            WHITE: '#FFFFFF',
+            BLACK: '#222222',
+            RED: '#FF4D4D',
+            GREEN: '#4DFF4D',
+            BLUE: '#4D4DFF',
+            YELLOW: '#FFFF4D',
+            PURPLE: '#B84DFF',
+            ORANGE: '#FFB84D',
+            PINK: '#FF4DB8',
+            CYAN: '#4DFFFF',
+            LIME: '#B8FF4D',
+            GRAY: '#888888',
+            DARK_GREEN: '#228B22',
+            SKY_BLUE: '#87CEEB',
+            SUNSET: '#FF7F50',
+            DIRT: '#8B5A2B',
+            DARK_DIRT: '#5D4037',
+            GOLD: '#FFD700',
+            SILVER: '#C0C0C0',
+            BRONZE: '#CD7F32'
+        };
+        
+        // Game settings with more dynamic values
+        const FPS = 60;
+        const PLAYER_SPEED = 6;
+        const BULLET_SPEED = 12;
+        const ENEMY_SPAWN_RATE = 45;  // frames
+        const DIFFICULTY_INCREASE_RATE = 450;  // frames
+        const POWERUP_SPAWN_RATE = 1000; // frames
+        
+        // Font settings with better hierarchy
+        const titleFont = 'bold 82px "Luckiest Guy", cursive, sans-serif';
+        const mainFont = '42px "Luckiest Guy", cursive, sans-serif';
+        const hudFont = 'bold 32px "Luckiest Guy", cursive, sans-serif';
+        const smallFont = 'bold 24px "Luckiest Guy", cursive, sans-serif';
+        
+        // Sound effects (commented out but ready to implement)
+        /*
+        const sounds = {
+            shoot: new Audio('shoot.wav'),
+            hit: new Audio('hit.wav'),
+            correct: new Audio('correct.wav'),
+            gameOver: new Audio('gameover.wav')
+        };
+        */
+        
+        // Create more detailed bug images with different types
+        function createBugImages() {
+            const bugTypes = [];
+            
+            for (let type = 0; type < 3; type++) {
+                const bugCanvas = document.createElement('canvas');
+                bugCanvas.width = 60;
+                bugCanvas.height = 50;
+                const bugCtx = bugCanvas.getContext('2d');
+                
+                // Different colors for different bug types
+                let primaryColor, secondaryColor;
+                switch(type) {
+                    case 0: // Purple bug
+                        primaryColor = COLORS.PURPLE;
+                        secondaryColor = COLORS.PINK;
+                        break;
+                    case 1: // Green bug
+                        primaryColor = '#4CAF50';
+                        secondaryColor = '#8BC34A';
+                        break;
+                    case 2: // Red bug
+                        primaryColor = '#F44336';
+                        secondaryColor = '#FF9800';
+                        break;
+                }
+                
+                // Body segments
+                bugCtx.fillStyle = primaryColor;
+                bugCtx.beginPath();
+                bugCtx.ellipse(30, 25, 25, 15, 0, 0, Math.PI * 2);
+                bugCtx.fill();
+                
+                // Head
+                bugCtx.fillStyle = primaryColor;
+                bugCtx.beginPath();
+                bugCtx.ellipse(50, 25, 10, 12, 0, 0, Math.PI * 2);
+                bugCtx.fill();
+                
+                // Eyes
+                bugCtx.fillStyle = COLORS.BLACK;
+                bugCtx.beginPath();
+                bugCtx.arc(55, 20, 3, 0, Math.PI * 2);
+                bugCtx.fill();
+                bugCtx.beginPath();
+                bugCtx.arc(55, 30, 3, 0, Math.PI * 2);
+                bugCtx.fill();
+                
+                // Antennae
+                bugCtx.strokeStyle = COLORS.BLACK;
+                bugCtx.lineWidth = 2;
+                bugCtx.beginPath();
+                bugCtx.moveTo(55, 15);
+                bugCtx.lineTo(65, 5);
+                bugCtx.stroke();
+                bugCtx.beginPath();
+                bugCtx.moveTo(55, 35);
+                bugCtx.lineTo(65, 45);
+                bugCtx.stroke();
+                
+                // Legs (6 legs like a real bug)
+                bugCtx.strokeStyle = COLORS.BLACK;
+                bugCtx.lineWidth = 3;
+                // Front legs
+                bugCtx.beginPath();
+                bugCtx.moveTo(40, 20);
+                bugCtx.lineTo(50, 10);
+                bugCtx.stroke();
+                bugCtx.beginPath();
+                bugCtx.moveTo(40, 30);
+                bugCtx.lineTo(50, 40);
+                bugCtx.stroke();
+                // Middle legs
+                bugCtx.beginPath();
+                bugCtx.moveTo(30, 20);
+                bugCtx.lineTo(30, 10);
+                bugCtx.stroke();
+                bugCtx.beginPath();
+                bugCtx.moveTo(30, 30);
+                bugCtx.lineTo(30, 40);
+                bugCtx.stroke();
+                // Back legs
+                bugCtx.beginPath();
+                bugCtx.moveTo(20, 20);
+                bugCtx.lineTo(10, 10);
+                bugCtx.stroke();
+                bugCtx.beginPath();
+                bugCtx.moveTo(20, 30);
+                bugCtx.lineTo(10, 40);
+                bugCtx.stroke();
+                
+                // Stripes or spots based on type
+                bugCtx.strokeStyle = secondaryColor;
+                bugCtx.lineWidth = 3;
+                if (type === 0 || type === 2) { // Stripes
+                    for (let i = 0; i < 3; i++) {
+                        bugCtx.beginPath();
+                        bugCtx.moveTo(15 + i*10, 15);
+                        bugCtx.lineTo(15 + i*10, 35);
+                        bugCtx.stroke();
+                    }
+                } else { // Spots
+                    for (let i = 0; i < 5; i++) {
+                        bugCtx.beginPath();
+                        bugCtx.arc(20 + i*8, 25, 3, 0, Math.PI * 2);
+                        bugCtx.fill();
+                    }
+                }
+                
+                bugTypes.push(bugCanvas);
+            }
+            
+            return bugTypes;
+        }
+        
+        // Create hole image with more detail
+        function createHoleImage() {
+            const holeCanvas = document.createElement('canvas');
+            holeCanvas.width = 70;
+            holeCanvas.height = 70;
+            const holeCtx = holeCanvas.getContext('2d');
+            
+            // Dirt mound with gradient
+            const moundGradient = holeCtx.createRadialGradient(35, 20, 0, 35, 20, 40);
+            moundGradient.addColorStop(0, '#A0522D');
+            moundGradient.addColorStop(1, '#8B4513');
+            holeCtx.fillStyle = moundGradient;
+            holeCtx.beginPath();
+            holeCtx.ellipse(35, 25, 35, 25, 0, 0, Math.PI * 2);
+            holeCtx.fill();
+            
+            // Hole with depth
+            holeCtx.fillStyle = '#5D4037';
+            holeCtx.beginPath();
+            holeCtx.ellipse(35, 40, 30, 20, 0, 0, Math.PI * 2);
+            holeCtx.fill();
+            
+            // Inner hole shadow
+            holeCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            holeCtx.beginPath();
+            holeCtx.ellipse(35, 45, 25, 15, 0, 0, Math.PI * 2);
+            holeCtx.fill();
+            
+            // Dirt texture with random pebbles
+            holeCtx.strokeStyle = '#5D4037';
+            holeCtx.lineWidth = 1;
+            for (let i = 0; i < 30; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * 25;
+                holeCtx.beginPath();
+                holeCtx.moveTo(35, 40);
+                holeCtx.lineTo(35 + Math.cos(angle) * dist, 40 + Math.sin(angle) * dist);
+                holeCtx.stroke();
+                
+                // Add some pebbles
+                if (i % 5 === 0) {
+                    const pebbleX = 35 + Math.cos(angle) * (dist * 0.8);
+                    const pebbleY = 40 + Math.sin(angle) * (dist * 0.8);
+                    holeCtx.fillStyle = '#795548';
+                    holeCtx.beginPath();
+                    holeCtx.arc(pebbleX, pebbleY, 1 + Math.random() * 2, 0, Math.PI * 2);
+                    holeCtx.fill();
+                }
+            }
+            
+            return holeCanvas;
+        }
+        
+        // Create bullet image with glow effect
+        function createBulletImage() {
+            const bulletCanvas = document.createElement('canvas');
+            bulletCanvas.width = 24;
+            bulletCanvas.height = 24;
+            const bulletCtx = bulletCanvas.getContext('2d');
+            
+            // Glowing effect with gradient
+            const gradient = bulletCtx.createRadialGradient(12, 12, 2, 12, 12, 12);
+            gradient.addColorStop(0, COLORS.YELLOW);
+            gradient.addColorStop(0.7, COLORS.ORANGE);
+            gradient.addColorStop(1, 'rgba(255, 184, 77, 0)');
+            
+            bulletCtx.fillStyle = gradient;
+            bulletCtx.beginPath();
+            bulletCtx.arc(12, 12, 12, 0, Math.PI * 2);
+            bulletCtx.fill();
+            
+            // Core light
+            bulletCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            bulletCtx.beginPath();
+            bulletCtx.arc(12, 12, 4, 0, Math.PI * 2);
+            bulletCtx.fill();
+            
+            return bulletCanvas;
+        }
+        
+        // Create power-up images
+        function createPowerupImages() {
+            const powerups = [];
+            const types = ['health', 'speed', 'damage'];
+            
+            for (const type of types) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 40;
+                canvas.height = 40;
+                const ctx = canvas.getContext('2d');
+                
+                // Common glow
+                const gradient = ctx.createRadialGradient(20, 20, 5, 20, 20, 20);
+                
+                // Different colors and symbols for each type
+                let color1, color2, symbol;
+                switch(type) {
+                    case 'health':
+                        color1 = '#FF4D4D';
+                        color2 = '#FF9999';
+                        symbol = '+';
+                        break;
+                    case 'speed':
+                        color1 = '#4D4DFF';
+                        color2 = '#9999FF';
+                        symbol = '⚡';
+                        break;
+                    case 'damage':
+                        color1 = '#FFB84D';
+                        color2 = '#FFDD99';
+                        symbol = '💥';
+                        break;
+                }
+                
+                gradient.addColorStop(0, color1);
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                
+                // Outer glow
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(20, 20, 20, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Inner circle
+                ctx.fillStyle = color1;
+                ctx.beginPath();
+                ctx.arc(20, 20, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Symbol
+                ctx.font = 'bold 24px Arial';
+                ctx.fillStyle = color2;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(symbol, 20, 20);
+                
+                powerups.push({
+                    type: type,
+                    image: canvas
+                });
+            }
+            
+            return powerups;
+        }
+        
+        // Create images
+        const bugImages = createBugImages();
+        const holeImg = createHoleImage();
+        const bulletImg = createBulletImage();
+        const powerupImages = createPowerupImages();
+        
+        // Background class with parallax effect
+        class Background {
+            constructor() {
+                this.clouds = [];
+                for (let i = 0; i < 15; i++) {
+                    this.clouds.push({
+                        x: Math.random() * canvas.width * 1.5,
+                        y: 50 + Math.random() * 150,
+                        speed: 0.1 + Math.random() * 0.5,
+                        size: 40 + Math.random() * 60,
+                        opacity: 0.7 + Math.random() * 0.3,
+                        layer: Math.floor(Math.random() * 3) + 1 // 1-3 layers for parallax
+                    });
+                }
+                
+                this.bushes = [];
+                for (let i = 0; i < 20; i++) {
+                    this.bushes.push({
+                        x: Math.random() * canvas.width,
+                        size: 50 + Math.random() * 80,
+                        color: `hsl(${100 + Math.random() * 40}, 70%, 30%)`
+                    });
+                }
+                
+                this.stars = [];
+                for (let i = 0; i < 100; i++) {
+                    this.stars.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height / 2,
+                        size: Math.random() * 2,
+                        brightness: 0.2 + Math.random() * 0.8,
+                        twinkleSpeed: Math.random() * 0.05
+                    });
+                }
+            }
+            
+            update(playerX) {
+                // Parallax effect based on player movement
+                const parallaxFactor = 0.02;
+                const playerMovement = playerX - canvas.width / 2;
+                
+                for (const cloud of this.clouds) {
+                    // Different layers move at different speeds for parallax
+                    cloud.x += cloud.speed + (playerMovement * parallaxFactor * cloud.layer);
+                    
+                    if (cloud.x > canvas.width + cloud.size) {
+                        cloud.x = -cloud.size;
+                        cloud.y = 50 + Math.random() * 150;
+                    } else if (cloud.x < -cloud.size) {
+                        cloud.x = canvas.width + cloud.size;
+                        cloud.y = 50 + Math.random() * 150;
+                    }
+                }
+                
+                // Twinkling stars
+                for (const star of this.stars) {
+                    star.brightness += star.twinkleSpeed;
+                    if (star.brightness > 1 || star.brightness < 0.2) {
+                        star.twinkleSpeed = -star.twinkleSpeed;
+                    }
+                }
+            }
+            
+            draw() {
+                // Gradient sky with day/night transition
+                const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                skyGradient.addColorStop(0, '#1E88E5');
+                skyGradient.addColorStop(0.5, '#64B5F6');
+                skyGradient.addColorStop(1, '#BBDEFB');
+                ctx.fillStyle = skyGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw stars
+                for (const star of this.stars) {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Sun with glow and rays
+                ctx.fillStyle = 'rgba(255, 235, 59, 0.8)';
+                ctx.beginPath();
+                ctx.arc(150, 150, 70, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Sun glow
+                ctx.shadowColor = '#FFEB3B';
+                ctx.shadowBlur = 40;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // Sun rays
+                ctx.strokeStyle = 'rgba(255, 235, 59, 0.6)';
+                ctx.lineWidth = 4;
+                for (let i = 0; i < 16; i++) {
+                    const angle = (i / 16) * Math.PI * 2;
+                    const length = 50 + Math.sin(Date.now() / 500 + i) * 10; // Animated length
+                    ctx.beginPath();
+                    ctx.moveTo(150, 150);
+                    ctx.lineTo(
+                        150 + Math.cos(angle) * (70 + length),
+                        150 + Math.sin(angle) * (70 + length)
+                    );
+                    ctx.stroke();
+                }
+                
+                // Clouds with shadows
+                for (const cloud of this.clouds) {
+                    // Cloud shadow
+                    ctx.fillStyle = `rgba(0, 0, 0, ${0.1 * cloud.opacity})`;
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        cloud.x + 5, 
+                        cloud.y + 5, 
+                        cloud.size, 
+                        cloud.size / 2, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    // Cloud
+                    ctx.fillStyle = `rgba(255, 255, 255, ${cloud.opacity})`;
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        cloud.x, 
+                        cloud.y, 
+                        cloud.size, 
+                        cloud.size / 2, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    // Cloud details
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        cloud.x + cloud.size / 3, 
+                        cloud.y - cloud.size / 4, 
+                        cloud.size * 0.8, 
+                        cloud.size / 2, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        cloud.x - cloud.size / 4, 
+                        cloud.y + cloud.size / 6, 
+                        cloud.size * 0.7, 
+                        cloud.size / 3, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+                
+                // Ground with gradient and texture
+                const groundGradient = ctx.createLinearGradient(
+                    0, canvas.height - 150, 
+                    0, canvas.height
+                );
+                groundGradient.addColorStop(0, '#2E7D32');
+                groundGradient.addColorStop(1, '#4CAF50');
+                ctx.fillStyle = groundGradient;
+                ctx.fillRect(0, canvas.height - 150, canvas.width, 150);
+                
+                // Dirt path with texture
+                ctx.fillStyle = '#5D4037';
+                ctx.beginPath();
+                ctx.ellipse(
+                    canvas.width / 2, 
+                    canvas.height - 100, 
+                    500, 
+                    50, 
+                    0, 0, Math.PI * 2
+                );
+                ctx.fill();
+                
+                // Dirt path texture with pebbles
+                ctx.strokeStyle = '#3E2723';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 80; i++) {
+                    const x = canvas.width / 2 - 500 + Math.random() * 1000;
+                    const y = canvas.height - 150 + Math.random() * 100;
+                    if (Math.pow((x - canvas.width/2)/500, 2) + 
+                        Math.pow((y - (canvas.height-100))/50, 2) <= 1) {
+                        const length = 5 + Math.random() * 20;
+                        const angle = Math.random() * Math.PI * 2;
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(
+                            x + Math.cos(angle) * length, 
+                            y + Math.sin(angle) * length
+                        );
+                        ctx.stroke();
+                        
+                        // Add some pebbles
+                        if (i % 8 === 0) {
+                            ctx.fillStyle = '#4E342E';
+                            ctx.beginPath();
+                            ctx.arc(
+                                x + Math.cos(angle) * length/2, 
+                                y + Math.sin(angle) * length/2, 
+                                1 + Math.random() * 3, 
+                                0, 
+                                Math.PI * 2
+                            );
+                            ctx.fill();
+                        }
+                    }
+                }
+                
+                // Bushes with shadows
+                for (const bush of this.bushes) {
+                    // Bush shadow
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        bush.x + 5, 
+                        canvas.height - 150 - bush.size / 2 + 5, 
+                        bush.size / 2, 
+                        bush.size / 2, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    // Main bush
+                    ctx.fillStyle = bush.color;
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        bush.x, 
+                        canvas.height - 150 - bush.size / 2, 
+                        bush.size / 2, 
+                        bush.size / 2, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    // Side bushes
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        bush.x + bush.size / 2, 
+                        canvas.height - 160 - bush.size / 2, 
+                        bush.size / 2, 
+                        bush.size / 2, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        bush.x - bush.size / 3, 
+                        canvas.height - 155 - bush.size / 2, 
+                        bush.size / 3, 
+                        bush.size / 3, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    // Bush highlights
+                    const highlightGradient = ctx.createRadialGradient(
+                        bush.x - 10, 
+                        canvas.height - 150 - bush.size / 2 - 10, 
+                        5, 
+                        bush.x - 10, 
+                        canvas.height - 150 - bush.size / 2 - 10, 
+                        bush.size / 2
+                    );
+                    highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+                    highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    
+                    ctx.fillStyle = highlightGradient;
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        bush.x, 
+                        canvas.height - 150 - bush.size / 2, 
+                        bush.size / 2, 
+                        bush.size / 2, 
+                        0, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+            }
+        }
+        
+        // Player class with power-ups
+        class Player {
+            constructor() {
+                this.x = canvas.width / 2;
+                this.y = canvas.height / 2;
+                this.radius = 35;
+                this.speed = PLAYER_SPEED;
+                this.health = 100;
+                this.maxHealth = 100;
+                this.score = 0;
+                this.bullets = [];
+                this.reloadTime = 0;
+                this.maxReload = 12;
+                this.image = holeImg;
+                this.currentInput = '';
+                this.powerups = {
+                    speed: { active: false, duration: 0, maxDuration: 600 }, // 10 seconds at 60fps
+                    damage: { active: false, duration: 0, maxDuration: 600 }
+                };
+                this.damageMultiplier = 1;
+                this.combo = 0;
+                this.comboTimer = 0;
+                this.comboMaxTime = 180; // 3 seconds at 60fps
+                this.hitFlash = 0;
+            }
+            
+            move(keys) {
+                // Apply speed power-up if active
+                const speedMultiplier = this.powerups.speed.active ? 1.5 : 1;
+                
+                if (keys['a'] && this.x > this.radius) {
+                    this.x -= this.speed * speedMultiplier;
+                }
+                if (keys['d'] && this.x < canvas.width - this.radius) {
+                    this.x += this.speed * speedMultiplier;
+                }
+                if (keys['w'] && this.y > this.radius) {
+                    this.y -= this.speed * speedMultiplier;
+                }
+                if (keys['s'] && this.y < canvas.height - this.radius) {
+                    this.y += this.speed * speedMultiplier;
+                }
+            }
+            
+            shoot(mouseX, mouseY) {
+                if (this.reloadTime <= 0) {
+                    const dx = mouseX - this.x;
+                    const dy = mouseY - this.y;
+                    const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+                    const normalizedDx = dx / distance;
+                    const normalizedDy = dy / distance;
+                    
+                    this.bullets.push({
+                        x: this.x,
+                        y: this.y,
+                        dx: normalizedDx * BULLET_SPEED,
+                        dy: normalizedDy * BULLET_SPEED,
+                        problem: generateMathProblem(),
+                        damage: 5 * this.damageMultiplier
+                    });
+                    this.reloadTime = this.maxReload;
+                    
+                    // Play shoot sound
+                    // sounds.shoot.currentTime = 0;
+                    // sounds.shoot.play();
+                }
+            }
+            
+            update() {
+                // Update reload time
+                if (this.reloadTime > 0) {
+                    this.reloadTime--;
+                }
+                
+                // Update bullet positions
+                for (let i = this.bullets.length - 1; i >= 0; i--) {
+                    const bullet = this.bullets[i];
+                    bullet.x += bullet.dx;
+                    bullet.y += bullet.dy;
+                    
+                    // Remove bullets that go off screen
+                    if (bullet.x < 0 || bullet.x > canvas.width || 
+                        bullet.y < 0 || bullet.y > canvas.height) {
+                        this.bullets.splice(i, 1);
+                    }
+                }
+                
+                // Update power-ups
+                for (const type in this.powerups) {
+                    if (this.powerups[type].active) {
+                        this.powerups[type].duration--;
+                        if (this.powerups[type].duration <= 0) {
+                            this.powerups[type].active = false;
+                            if (type === 'damage') {
+                                this.damageMultiplier = 1;
+                            }
+                        }
+                    }
+                }
+                
+                // Update combo timer
+                if (this.combo > 0) {
+                    this.comboTimer--;
+                    if (this.comboTimer <= 0) {
+                        this.combo = 0;
+                    }
+                }
+                
+                // Update hit flash effect
+                if (this.hitFlash > 0) {
+                    this.hitFlash--;
+                }
+            }
+            
+            draw() {
+                // Draw player (hole) with hit flash effect if damaged
+                ctx.save();
+                if (this.hitFlash > 0) {
+                    ctx.filter = `brightness(${1 + this.hitFlash/10})`;
+                }
+                ctx.drawImage(
+                    this.image, 
+                    this.x - this.image.width / 2, 
+                    this.y - this.image.height / 2
+                );
+                ctx.restore();
+                
+                // Draw bullets with trail effect
+                for (const bullet of this.bullets) {
+                    // Bullet trail
+                    ctx.strokeStyle = `rgba(255, 184, 77, 0.5)`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        bullet.x - bullet.dx * 2, 
+                        bullet.y - bullet.dy * 2
+                    );
+                    ctx.lineTo(bullet.x, bullet.y);
+                    ctx.stroke();
+                    
+                    // Bullet glow
+                    ctx.shadowColor = COLORS.ORANGE;
+                    ctx.shadowBlur = 15;
+                    ctx.drawImage(
+                        bulletImg, 
+                        bullet.x - bulletImg.width / 2, 
+                        bullet.y - bulletImg.height / 2
+                    );
+                    ctx.shadowBlur = 0;
+                    
+                    // Draw math problem with better styling
+                    ctx.font = 'bold 26px "Luckiest Guy", cursive, sans-serif';
+                    ctx.fillStyle = COLORS.BLACK;
+                    ctx.strokeStyle = COLORS.WHITE;
+                    ctx.lineWidth = 4;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.strokeText(bullet.problem.text, bullet.x, bullet.y - 30);
+                    ctx.fillText(bullet.problem.text, bullet.x, bullet.y - 30);
+                }
+                
+                // Draw power-up indicators
+                if (this.powerups.speed.active) {
+                    ctx.fillStyle = `rgba(77, 77, 255, ${0.3 + 0.2 * Math.sin(Date.now() / 200)})`;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius + 10, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                if (this.powerups.damage.active) {
+                    ctx.fillStyle = `rgba(255, 184, 77, ${0.3 + 0.2 * Math.sin(Date.now() / 200)})`;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius + 15, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            activatePowerup(type) {
+                this.powerups[type].active = true;
+                this.powerups[type].duration = this.powerups[type].maxDuration;
+                
+                if (type === 'damage') {
+                    this.damageMultiplier = 2;
+                }
+                
+                // Play power-up sound
+                // sounds.correct.currentTime = 0;
+                // sounds.correct.play();
+            }
+            
+            addCombo() {
+                this.combo++;
+                this.comboTimer = this.comboMaxTime;
+                
+                // Bonus points for combos
+                if (this.combo % 5 === 0) {
+                    this.score += this.combo * 10;
+                }
+            }
+        }
+        
+        // Enemy class with different types
+        class Enemy {
+            constructor(difficulty) {
+                const side = Math.floor(Math.random() * 4);  // 0: top, 1: right, 2: bottom, 3: left
+                if (side === 0) {  // top
+                    this.x = Math.random() * canvas.width;
+                    this.y = -40;
+                } else if (side === 1) {  // right
+                    this.x = canvas.width + 40;
+                    this.y = Math.random() * canvas.height;
+                } else if (side === 2) {  // bottom
+                    this.x = Math.random() * canvas.width;
+                    this.y = canvas.height + 40;
+                } else {  // left
+                    this.x = -40;
+                    this.y = Math.random() * canvas.height;
+                }
+                
+                this.radius = 25;
+                this.speed = 1 + difficulty * 0.15;
+                this.health = 10 + difficulty * 3;
+                this.maxHealth = this.health;
+                this.problem = generateMathProblem(difficulty);
+                this.answer = String(this.problem.answer);
+                this.type = Math.floor(Math.random() * bugImages.length);
+                this.image = bugImages[this.type];
+                this.wobble = 0;
+                this.wobbleSpeed = 0.05 + Math.random() * 0.05;
+                this.wobbleAmount = 2 + Math.random() * 3;
+                this.hitFlash = 0;
+            }
+            
+            move(playerX, playerY) {
+                // Wobble effect
+                this.wobble += this.wobbleSpeed;
+                
+                const dx = playerX - this.x;
+                const dy = playerY - this.y;
+                const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+                this.x += (dx / distance) * this.speed;
+                this.y += (dy / distance) * this.speed;
+                
+                // Update hit flash
+                if (this.hitFlash > 0) {
+                    this.hitFlash--;
+                }
+            }
+            
+            draw() {
+                // Apply wobble effect
+                const wobbleOffset = Math.sin(this.wobble) * this.wobbleAmount;
+                
+                // Draw enemy (bug) with hit flash if damaged
+                ctx.save();
+                if (this.hitFlash > 0) {
+                    ctx.filter = `brightness(${1 + this.hitFlash/5})`;
+                }
+                
+                if (this.type === 1) {
+                    // Flip bug horizontally for variety
+                    ctx.translate(this.x + this.image.width / 2, this.y + wobbleOffset);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(this.image, 0, -this.image.height / 2);
+                } else {
+                    ctx.drawImage(
+                        this.image, 
+                        this.x - this.image.width / 2, 
+                        this.y - this.image.height / 2 + wobbleOffset
+                    );
+                }
+                ctx.restore();
+                
+                // Draw health bar with border
+                const healthWidth = 50;
+                const healthHeight = 8;
+                const healthX = this.x - healthWidth / 2;
+                const healthY = this.y - this.radius - 25;
+                
+                // Health bar background
+                ctx.fillStyle = COLORS.BLACK;
+                ctx.fillRect(
+                    healthX - 2, 
+                    healthY - 2, 
+                    healthWidth + 4, 
+                    healthHeight + 4
+                );
+                
+                // Health bar
+                ctx.fillStyle = COLORS.GRAY;
+                ctx.fillRect(healthX, healthY, healthWidth, healthHeight);
+                
+                // Current health with gradient
+                const healthGradient = ctx.createLinearGradient(
+                    healthX, 
+                    healthY, 
+                    healthX + healthWidth * (this.health / this.maxHealth), 
+                    healthY
+                );
+                healthGradient.addColorStop(0, '#FF5252');
+                healthGradient.addColorStop(0.5, '#FFEB3B');
+                healthGradient.addColorStop(1, '#4CAF50');
+                
+                ctx.fillStyle = healthGradient;
+                ctx.fillRect(
+                    healthX, 
+                    healthY, 
+                    healthWidth * (this.health / this.maxHealth), 
+                    healthHeight
+                );
+                
+                // Draw math problem with better styling
+                ctx.font = 'bold 30px "Luckiest Guy", cursive, sans-serif';
+                ctx.fillStyle = COLORS.BLACK;
+                ctx.strokeStyle = COLORS.WHITE;
+                ctx.lineWidth = 4;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.strokeText(
+                    this.problem.text, 
+                    this.x, 
+                    this.y + this.radius + 15 + wobbleOffset
+                );
+                ctx.fillText(
+                    this.problem.text, 
+                    this.x, 
+                    this.y + this.radius + 15 + wobbleOffset
+                );
+            }
+            
+            takeDamage(amount) {
+                this.health -= amount;
+                this.hitFlash = 5;
+                
+                // Play hit sound
+                // sounds.hit.currentTime = 0;
+                // sounds.hit.play();
+            }
+        }
+        
+        // Powerup class
+        class Powerup {
+            constructor(type) {
+                this.x = Math.random() * (canvas.width - 100) + 50;
+                this.y = Math.random() * (canvas.height - 200) + 50;
+                this.type = type;
+                this.image = powerupImages.find(p => p.type === type).image;
+                this.radius = 20;
+                this.lifetime = 600; // 10 seconds at 60fps
+                this.pulse = 0;
+            }
+            
+            update() {
+                this.lifetime--;
+                this.pulse += 0.05;
+            }
+            
+            draw() {
+                // Pulsing glow effect
+                const pulseSize = Math.sin(this.pulse) * 5;
+                
+                ctx.save();
+                
+                // Outer glow
+                ctx.shadowColor = this.type === 'health' ? '#FF4D4D' : 
+                                  this.type === 'speed' ? '#4D4DFF' : '#FFB84D';
+                ctx.shadowBlur = 15 + pulseSize;
+                ctx.drawImage(
+                    this.image, 
+                    this.x - this.image.width / 2, 
+                    this.y - this.image.height / 2
+                );
+                
+                ctx.shadowBlur = 0;
+                ctx.restore();
+                
+                // Draw remaining time indicator
+                if (this.lifetime < 120) { // Blink last 2 seconds
+                    if (Math.floor(Date.now() / 200) % 2 === 0) {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                        ctx.beginPath();
+                        ctx.arc(
+                            this.x, 
+                            this.y - 30, 
+                            3 + pulseSize/2, 
+                            0, 
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+        
+        // Generate math problem with varying difficulty
+        function generateMathProblem(difficulty = 1) {
+            // Adjust operations based on difficulty
+            let operations = ['+', '-'];
+            if (difficulty > 3) operations.push('*');
+            if (difficulty > 6) operations.push('/');
+            
+            const op = operations[Math.floor(Math.random() * operations.length)];
+            
+            let a, b, answer;
+            let problemText;
+            
+            if (op === '+') {
+                a = Math.floor(1 + Math.random() * (5 + difficulty * 4));
+                b = Math.floor(1 + Math.random() * (5 + difficulty * 4));
+                answer = a + b;
+                problemText = `${a} + ${b} = ?`;
+            } else if (op === '-') {
+                a = Math.floor(3 + difficulty * 3 + Math.random() * (10 + difficulty * 4));
+                b = Math.floor(1 + Math.random() * (a - 1));
+                answer = a - b;
+                problemText = `${a} - ${b} = ?`;
+            } else if (op === '*') {
+                a = Math.floor(1 + Math.random() * (2 + Math.floor(difficulty / 2)));
+                b = Math.floor(1 + Math.random() * (5 + difficulty));
+                answer = a * b;
+                problemText = `${a} × ${b} = ?`;
+            } else {  // '/'
+                b = Math.floor(2 + Math.random() * (3 + Math.floor(difficulty / 3)));
+                answer = Math.floor(1 + Math.random() * (5 + difficulty));
+                a = answer * b;
+                problemText = `${a} ÷ ${b} = ?`;
+            }
+            
+            return {
+                text: problemText,
+                answer: answer
+            };
+        }
+        
+        // Draw HUD with improved layout
+        function drawHUD(player, difficulty) {
+            // Health bar with better styling
+            const healthWidth = 300;
+            const healthHeight = 30;
+            const healthX = 30;
+            const healthY = 30;
+            
+            // Health bar background
+            ctx.fillStyle = COLORS.BLACK;
+            ctx.fillRect(
+                healthX - 3, 
+                healthY - 3, 
+                healthWidth + 6, 
+                healthHeight + 6
+            );
+            
+            // Health bar fill with gradient
+            const healthGradient = ctx.createLinearGradient(
+                healthX, 
+                healthY, 
+                healthX + healthWidth * (player.health / player.maxHealth), 
+                healthY
+            );
+            healthGradient.addColorStop(0, '#FF5252');
+            healthGradient.addColorStop(0.5, '#FFEB3B');
+            healthGradient.addColorStop(1, '#4CAF50');
+            
+            ctx.fillStyle = healthGradient;
+            ctx.fillRect(
+                healthX, 
+                healthY, 
+                healthWidth * (player.health / player.maxHealth), 
+                healthHeight
+            );
+            
+            // Health bar border
+            ctx.strokeStyle = COLORS.WHITE;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(healthX, healthY, healthWidth, healthHeight);
+            
+            // Health text with outline
+            ctx.font = hudFont;
+            ctx.fillStyle = COLORS.WHITE;
+            ctx.strokeStyle = COLORS.BLACK;
+            ctx.lineWidth = 4;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.strokeText(
+                `HEALTH: ${player.health}/${player.maxHealth}`, 
+                healthX + healthWidth + 20, 
+                healthY + healthHeight / 2
+            );
+            ctx.fillText(
+                `HEALTH: ${player.health}/${player.maxHealth}`, 
+                healthX + healthWidth + 20, 
+                healthY + healthHeight / 2
+            );
+            
+            // Score with outline
+            ctx.strokeText(
+                `SCORE: ${player.score}`, 
+                healthX, 
+                healthY + healthHeight + 40
+            );
+            ctx.fillText(
+                `SCORE: ${player.score}`, 
+                healthX, 
+                healthY + healthHeight + 40
+            );
+            
+            // Level with outline
+            ctx.strokeText(
+                `LEVEL: ${difficulty}`, 
+                healthX, 
+                healthY + healthHeight + 80
+            );
+            ctx.fillText(
+                `LEVEL: ${difficulty}`, 
+                healthX, 
+                healthY + healthHeight + 80
+            );
+            
+            // Combo counter with animation
+            if (player.combo > 0) {
+                const comboScale = 1 + Math.sin(Date.now() / 100) * 0.1;
+                const comboX = canvas.width - 100;
+                const comboY = 60;
+                
+                ctx.save();
+                ctx.translate(comboX, comboY);
+                ctx.scale(comboScale, comboScale);
+                
+                ctx.font = 'bold 48px "Luckiest Guy", cursive, sans-serif';
+                ctx.fillStyle = COLORS.YELLOW;
+                ctx.strokeStyle = COLORS.ORANGE;
+                ctx.lineWidth = 4;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.strokeText(`${player.combo}x COMBO!`, 0, 0);
+                ctx.fillText(`${player.combo}x COMBO!`, 0, 0);
+                
+                // Combo timer indicator
+                const timerWidth = 100 * (player.comboTimer / player.comboMaxTime);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.fillRect(-50, 30, timerWidth, 5);
+                
+                ctx.restore();
+            }
+            
+            // Power-up indicators
+            let powerupY = healthY + healthHeight + 120;
+            for (const type in player.powerups) {
+                if (player.powerups[type].active) {
+                    const remaining = player.powerups[type].duration / player.powerups[type].maxDuration;
+                    
+                    ctx.font = smallFont;
+                    ctx.fillStyle = type === 'speed' ? COLORS.BLUE : 
+                                   type === 'damage' ? COLORS.ORANGE : COLORS.RED;
+                    ctx.strokeStyle = COLORS.BLACK;
+                    ctx.lineWidth = 2;
+                    ctx.textAlign = 'left';
+                    
+                    const text = type.toUpperCase() + ': ' + 
+                        Math.ceil(player.powerups[type].duration / FPS) + 's';
+                    
+                    ctx.strokeText(text, healthX, powerupY);
+                    ctx.fillText(text, healthX, powerupY);
+                    
+                    // Timer bar
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                    ctx.fillRect(healthX, powerupY + 10, 150, 8);
+                    ctx.fillStyle = type === 'speed' ? COLORS.BLUE : 
+                                  type === 'damage' ? COLORS.ORANGE : COLORS.RED;
+                    ctx.fillRect(healthX, powerupY + 10, 150 * remaining, 8);
+                    
+                    powerupY += 30;
+                }
+            }
+            
+            // Current input with glowing effect
+            if (player.currentInput) {
+                ctx.font = mainFont;
+                ctx.fillStyle = COLORS.YELLOW;
+                ctx.strokeStyle = COLORS.ORANGE;
+                ctx.lineWidth = 4;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.strokeText(player.currentInput, canvas.width / 2, 70);
+                ctx.fillText(player.currentInput, canvas.width / 2, 70);
+                
+                // Add glow effect
+                ctx.shadowColor = COLORS.YELLOW;
+                ctx.shadowBlur = 20;
+                ctx.fillText(player.currentInput, canvas.width / 2, 70);
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        // Main game class with enhanced features
+        class Game {
+            constructor() {
+                this.player = new Player();
+                this.background = new Background();
+                this.enemies = [];
+                this.powerups = [];
+                this.difficulty = 1;
+                this.frameCount = 0;
+                this.gameOver = false;
+                this.keys = {};
+                this.paused = false;
+                this.waveCount = 0;
+                
+                // Event listeners
+                canvas.addEventListener('mousedown', (e) => {
+                    if (!this.gameOver && !this.paused && e.button === 0) {  // Left click
+                        const rect = canvas.getBoundingClientRect();
+                        const mouseX = e.clientX - rect.left;
+                        const mouseY = e.clientY - rect.top;
+                        this.player.shoot(mouseX, mouseY);
+                    }
+                });
+                
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && this.player.currentInput) {
+                        // Check bullets for matching answers
+                        for (let i = this.player.bullets.length - 1; i >= 0; i--) {
+                            const bullet = this.player.bullets[i];
+                            if (bullet.problem.answer === parseInt(this.player.currentInput)) {
+                                this.player.bullets.splice(i, 1);
+                                this.player.score += 10;
+                                this.player.addCombo();
+                            }
+                        }
+                        
+                        // Check enemies for matching answers
+                        let correctAnswer = false;
+                        for (let i = this.enemies.length - 1; i >= 0; i--) {
+                            const enemy = this.enemies[i];
+                            if (enemy.answer === this.player.currentInput) {
+                                this.enemies.splice(i, 1);
+                                this.player.score += 50 + this.difficulty * 5;
+                                this.player.addCombo();
+                                correctAnswer = true;
+                                
+                                // Play correct answer sound
+                                // sounds.correct.currentTime = 0;
+                                // sounds.correct.play();
+                            }
+                        }
+                        
+                        if (correctAnswer) {
+                            // Show "CORRECT!" text briefly
+                            this.showFeedback('CORRECT!', COLORS.GREEN);
+                        } else if (this.player.currentInput.length > 0) {
+                            // Show "WRONG!" text briefly
+                            this.showFeedback('WRONG!', COLORS.RED);
+                        }
+                        
+                        this.player.currentInput = '';
+                    } else if (e.key === 'Backspace') {
+                        this.player.currentInput = this.player.currentInput.slice(0, -1);
+                    } else if (e.key >= '0' && e.key <= '9') {
+                        this.player.currentInput += e.key;
+                    } else if (e.key === 'r' && this.gameOver) {
+                        // Restart game
+                        this.resetGame();
+                    } else if (e.key === 'p' && !this.gameOver) {
+                        // Pause game
+                        this.paused = !this.paused;
+                    } else if (e.key === 'm') {
+                        // Toggle mute (would be used with sound)
+                        // this.muted = !this.muted;
+                    }
+                    
+                    // Track key presses for movement
+                    if (['a', 'd', 'w', 's'].includes(e.key.toLowerCase())) {
+                        this.keys[e.key.toLowerCase()] = true;
+                    }
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    if (['a', 'd', 'w', 's'].includes(e.key.toLowerCase())) {
+                        this.keys[e.key.toLowerCase()] = false;
+                    }
+                });
+                
+                // Start loading assets
+                loadAssets();
+            }
+            
+            showFeedback(text, color) {
+                this.feedbackText = text;
+                this.feedbackColor = color;
+                this.feedbackTimer = 60; // 1 second at 60fps
+            }
+            
+            resetGame() {
+                this.player = new Player();
+                this.enemies = [];
+                this.powerups = [];
+                this.difficulty = 1;
+                this.frameCount = 0;
+                this.gameOver = false;
+                this.waveCount = 0;
+                this.paused = false;
+            }
+            
+            spawnWave() {
+                this.waveCount++;
+                const waveSize = 5 + this.difficulty + Math.floor(this.waveCount / 3);
+                
+                for (let i = 0; i < waveSize; i++) {
+                    // Delay enemy spawns slightly for wave effect
+                    setTimeout(() => {
+                        if (!this.gameOver && !this.paused) {
+                            this.enemies.push(new Enemy(this.difficulty));
+                        }
+                    }, i * 200);
+                }
+                
+                // Show wave indicator
+                this.showFeedback(`WAVE ${this.waveCount} INCOMING!`, COLORS.YELLOW);
+            }
+            
+            update() {
+                if (!this.gameOver && !this.paused) {
+                    // Update background with parallax effect
+                    this.background.update(this.player.x);
+                    
+                    // Update player
+                    this.player.move(this.keys);
+                    this.player.update();
+                    
+                    // Spawn enemies in waves
+                    if (this.frameCount % (ENEMY_SPAWN_RATE * 5) === 0) {
+                        this.spawnWave();
+                    }
+                    
+                    // Spawn power-ups occasionally
+                    if (this.frameCount % POWERUP_SPAWN_RATE === 0 && 
+                        this.powerups.length < 2 && 
+                        Math.random() < 0.3) {
+                        const types = ['health', 'speed', 'damage'];
+                        const type = types[Math.floor(Math.random() * types.length)];
+                        this.powerups.push(new Powerup(type));
+                    }
+                    
+                    // Increase difficulty
+                    if (this.frameCount % DIFFICULTY_INCREASE_RATE === 0) {
+                        this.difficulty++;
+                        this.showFeedback(`LEVEL UP! ${this.difficulty}`, COLORS.CYAN);
+                    }
+                    
+                    // Update enemies
+                    for (let i = this.enemies.length - 1; i >= 0; i--) {
+                        const enemy = this.enemies[i];
+                        enemy.move(this.player.x, this.player.y);
+                        
+                        // Check collision with player
+                        const dx = enemy.x - this.player.x;
+                        const dy = enemy.y - this.player.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance < enemy.radius + this.player.radius) {
+                            this.player.health -= 0.5;
+                            this.player.hitFlash = 5;
+                            
+                            if (this.player.health <= 0) {
+                                this.player.health = 0;
+                                this.gameOver = true;
+                                // sounds.gameOver.play();
+                            }
+                        }
+                        
+                        // Check bullet-enemy collisions
+                        for (let j = this.player.bullets.length - 1; j >= 0; j--) {
+                            const bullet = this.player.bullets[j];
+                            const bulletDx = bullet.x - enemy.x;
+                            const bulletDy = bullet.y - enemy.y;
+                            const bulletDistance = Math.sqrt(bulletDx * bulletDx + bulletDy * bulletDy);
+                            if (bulletDistance < enemy.radius + 15) {
+                                enemy.takeDamage(bullet.damage);
+                                if (enemy.health <= 0) {
+                                    this.enemies.splice(i, 1);
+                                    this.player.score += 30 + this.difficulty * 2;
+                                    this.player.addCombo();
+                                }
+                                this.player.bullets.splice(j, 1);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Update power-ups
+                    for (let i = this.powerups.length - 1; i >= 0; i--) {
+                        const powerup = this.powerups[i];
+                        powerup.update();
+                        
+                        if (powerup.lifetime <= 0) {
+                            this.powerups.splice(i, 1);
+                            continue;
+                        }
+                        
+                        // Check player collision with power-up
+                        const dx = powerup.x - this.player.x;
+                        const dy = powerup.y - this.player.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance < powerup.radius + this.player.radius) {
+                            if (powerup.type === 'health') {
+                                this.player.health = Math.min(
+                                    this.player.maxHealth, 
+                                    this.player.health + 20
+                                );
+                            } else {
+                                this.player.activatePowerup(powerup.type);
+                            }
+                            this.powerups.splice(i, 1);
+                            this.player.score += 25;
+                        }
+                    }
+                    
+                    // Update feedback timer
+                    if (this.feedbackTimer > 0) {
+                        this.feedbackTimer--;
+                    }
+                    
+                    this.frameCount++;
+                }
+            }
+            
+            draw() {
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw background
+                this.background.draw();
+                
+                // Draw power-ups first (so they appear under enemies)
+                for (const powerup of this.powerups) {
+                    powerup.draw();
+                }
+                
+                // Draw player and enemies
+                if (!this.gameOver) {
+                    for (const enemy of this.enemies) {
+                        enemy.draw();
+                    }
+                    this.player.draw();
+                }
+                
+                // Draw HUD
+                drawHUD(this.player, this.difficulty);
+                
+                // Draw feedback text if active
+                if (this.feedbackTimer > 0) {
+                    const scale = 1 + (this.feedbackTimer / 60) * 0.5;
+                    const alpha = this.feedbackTimer / 60;
+                    
+                    ctx.save();
+                    ctx.translate(canvas.width / 2, canvas.height / 2 - 100);
+                    ctx.scale(scale, scale);
+                    
+                    ctx.font = 'bold 64px "Luckiest Guy", cursive, sans-serif';
+                    ctx.fillStyle = `rgba(${this.feedbackColor.substring(1).match(/.{2}/g).map(x => parseInt(x, 16)).join(',')}, ${alpha})`;
+                    ctx.strokeStyle = COLORS.BLACK;
+                    ctx.lineWidth = 6;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.strokeText(this.feedbackText, 0, 0);
+                    ctx.fillText(this.feedbackText, 0, 0);
+                    
+                    ctx.restore();
+                }
+                
+                // Pause screen
+                if (this.paused && !this.gameOver) {
+                    // Dark overlay
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Paused text
+                    ctx.font = titleFont;
+                    ctx.fillStyle = COLORS.YELLOW;
+                    ctx.strokeStyle = COLORS.ORANGE;
+                    ctx.lineWidth = 8;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.strokeText('PAUSED', canvas.width / 2, canvas.height / 2 - 50);
+                    ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2 - 50);
+                    
+                    // Instructions
+                    ctx.font = hudFont;
+                    ctx.fillStyle = COLORS.WHITE;
+                    ctx.strokeStyle = COLORS.BLACK;
+                    ctx.lineWidth = 4;
+                    ctx.fillText('Press P to resume', canvas.width / 2, canvas.height / 2 + 50);
+                }
+                
+                // Game over screen with better styling
+                if (this.gameOver) {
+                    // Dark overlay with vignette effect
+                    const gradient = ctx.createRadialGradient(
+                        canvas.width/2, canvas.height/2, 100,
+                        canvas.width/2, canvas.height/2, Math.max(canvas.width, canvas.height)/2
+                    );
+                    gradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Game over text with glow
+                    ctx.font = titleFont;
+                    ctx.fillStyle = COLORS.RED;
+                    ctx.strokeStyle = COLORS.BLACK;
+                    ctx.lineWidth = 8;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.strokeText('GAME OVER', canvas.width / 2, canvas.height / 2 - 100);
+                    ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 100);
+                    
+                    // Add glow
+                    ctx.shadowColor = COLORS.RED;
+                    ctx.shadowBlur = 30;
+                    ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 100);
+                    ctx.shadowBlur = 0;
+                    
+                    // Score text
+                    ctx.font = mainFont;
+                    ctx.fillStyle = COLORS.WHITE;
+                    ctx.strokeStyle = COLORS.BLACK;
+                    ctx.lineWidth = 5;
+                    ctx.strokeText(`FINAL SCORE: ${this.player.score}`, canvas.width / 2, canvas.height / 2);
+                    ctx.fillText(`FINAL SCORE: ${this.player.score}`, canvas.width / 2, canvas.height / 2);
+                    
+                    // Level reached
+                    ctx.strokeText(`LEVEL REACHED: ${this.difficulty}`, canvas.width / 2, canvas.height / 2 + 50);
+                    ctx.fillText(`LEVEL REACHED: ${this.difficulty}`, canvas.width / 2, canvas.height / 2 + 50);
+                    
+                    // Restart text with blinking effect
+                    if (Math.floor(Date.now() / 500) % 2 === 0) {
+                        ctx.font = hudFont;
+                        ctx.fillStyle = COLORS.YELLOW;
+                        ctx.strokeStyle = COLORS.ORANGE;
+                        ctx.lineWidth = 3;
+                        ctx.strokeText('PRESS R TO RESTART', canvas.width / 2, canvas.height / 2 + 150);
+                        ctx.fillText('PRESS R TO RESTART', canvas.width / 2, canvas.height / 2 + 150);
+                    }
+                }
+            }
+            
+            run() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.run());
+            }
+        }
+        
+        // Start the game
+        const game = new Game();
+        game.run();
+    </script>
+</body>
+</html>
